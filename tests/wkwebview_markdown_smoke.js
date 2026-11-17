@@ -25,6 +25,10 @@
     return false;
   }
 
+  // Start from a clean slate even if the host reuses storage between runs.
+  for (const key of Object.keys(localStorage)) {
+    if (key.startsWith('babyreader')) localStorage.removeItem(key);
+  }
   localStorage.removeItem('babyreader-theme');
   window.__nativeMessages = [];
   const originalSendNative = window.sendNative;

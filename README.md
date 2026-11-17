@@ -73,6 +73,22 @@ To create a clean release zip:
 ./scripts/package_release.sh
 ```
 
+### iPad (iPadOS 17+)
+
+The iPad app lives in `ios/`. It is a thin UIKit shell (`ios/BabyReader/main.m`) around the same `web/` front end the Mac app uses, so reader, editor, themes, and EPUB highlights behave the same on both.
+
+1. Open `ios/BabyReader.xcodeproj` in Xcode (full Xcode, not just the command-line tools).
+2. Select the **BabyReader** target → **Signing & Capabilities** → pick your Team (a free Apple ID works, but the app then expires after 7 days). If Xcode says the bundle ID is taken, change `com.baobao.babyreader.ipad` to something unique.
+3. Connect the iPad, choose it as the run destination, and press ⌘R. The first time, trust the developer on the iPad under **Settings → General → VPN & Device Management**.
+
+On iPad:
+
+- Tap the folder icon in the top bar (or ⌘O with a keyboard) to open `.md`, `.txt`, or `.epub` from Files, iCloud Drive, or other providers. Files are opened in place, so edits save back to the original.
+- In the Files app, use **Share → BabyReader** or long-press → **Open With** to send a file straight to BabyReader.
+- Edits save automatically when you switch back to read mode or leave the app; ⌘S / ⇧⌘S also work.
+- EPUB highlight exports auto-save to **Files → On My iPad → BabyReader → BabyReader**.
+- Keyboard shortcuts match the Mac, except **Highlight is ⇧⌘H** (iPadOS reserves ⌘H).
+
 ## What's New in 2.0
 
 - **EPUB reader** — table-of-contents sidebar, continuous scrolling, embedded images, warm dark/light themes that actually feel warm

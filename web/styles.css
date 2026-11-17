@@ -29,7 +29,7 @@
 
   --font-serif:  "Songti SC", "Iowan Old Style", Georgia, serif;
   --font-sans:   -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
-  --font-mono:   "SF Mono", "JetBrains Mono", Menlo, "Courier New", monospace;
+  --font-mono:   ui-monospace, "SF Mono", "JetBrains Mono", Menlo, "Courier New", monospace;
 }
 
 body.theme-light {
@@ -989,4 +989,77 @@ body.immersive .topbar {
 
 body.immersive .reader .article {
   padding-top: 56px; /* reduced top padding without topbar */
+}
+
+/* ============================================================
+   iPadOS host (html.platform-ios is set by ios/BabyReader/main.m)
+   Kept deliberately minimal so the iPad looks and moves exactly like
+   the Mac app: only what the platform itself requires lives here.
+   ============================================================ */
+
+/* iPadOS has no menu bar, so the toolbar needs an Open button. */
+.open-btn {
+  display: none;
+}
+
+.platform-ios .open-btn {
+  display: inline-flex;
+}
+
+/* Mac reserves 76px on the left for the traffic lights; iPad has none,
+   but the status bar / Stage Manager controls sit in the top safe area. */
+.platform-ios {
+  --topbar-h: calc(52px + env(safe-area-inset-top, 0px));
+  -webkit-text-size-adjust: 100%;
+}
+
+.platform-ios .topbar {
+  padding: calc(env(safe-area-inset-top, 0px) + 4px)
+           calc(20px + env(safe-area-inset-right, 0px))
+           0
+           calc(20px + env(safe-area-inset-left, 0px));
+}
+
+/* No grey tap flash or long-press callout on controls (neither exists on Mac). */
+.platform-ios body {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.platform-ios .topbar button,
+.platform-ios .toc a {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Touch has no pointer to move away, so WebKit leaves :hover stuck on the
+   last tapped control. Show the Mac hover look only while the finger is down;
+   the existing 0.15s transitions then fade it out exactly like moving the
+   mouse off a button on the Mac. Trackpad/mouse on iPad keeps real hover. */
+@media (hover: none) {
+  .platform-ios .mode-btn:not(.active):hover,
+  .platform-ios .theme-btn:hover,
+  .platform-ios .reader-tool-btn:hover,
+  .platform-ios .toc-toggle:hover {
+    color: var(--text-muted);
+    background: transparent;
+  }
+
+  .platform-ios .mode-btn:not(.active):active {
+    color: var(--text);
+    background: var(--hover-bg);
+  }
+
+  .platform-ios .theme-btn:active,
+  .platform-ios .reader-tool-btn:active,
+  .platform-ios .toc-toggle:active {
+    color: var(--accent);
+    background: var(--hover-bg);
+  }
+
+  .platform-ios .highlight-pill:hover {
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--text);
+  }
 }
