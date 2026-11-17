@@ -24,6 +24,9 @@
   WKWebpagePreferences *pagePrefs = [[WKWebpagePreferences alloc] init];
   pagePrefs.allowsContentJavaScript = YES;
   config.defaultWebpagePreferences = pagePrefs;
+  // Fresh, in-memory storage per run: localStorage left over from a previous
+  // run (saved highlights) would otherwise flip the highlight toggle tests.
+  config.websiteDataStore = [WKWebsiteDataStore nonPersistentDataStore];
 
   WKUserContentController *ucc = [[WKUserContentController alloc] init];
   [ucc addScriptMessageHandler:self name:@"native"];

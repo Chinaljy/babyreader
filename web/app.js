@@ -923,20 +923,51 @@ function setupDomHighlightInteraction() {
     const sel = window.getSelection?.();
     if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
     const range = sel.getRangeAt(0);
+    if (!article.contains(range.commonAncestorContainer)) return;
+    rememberReaderSelection(range, sel.toString());
     setPendingDomHighlight(range, sel.toString());
   };
 
   article.addEventListener('mouseup', () => setTimeout(readSelection, 0));
   article.addEventListener('keyup', () => setTimeout(readSelection, 0));
   article.addEventListener('touchend', () => setTimeout(readSelection, 120));
+
+  // iPadOS finishes long-press selections and handle drags after touchend.
+  let selectionTimer = null;
+  document.addEventListener('selectionchange', () => {
+    clearTimeout(selectionTimer);
+    selectionTimer = setTimeout(readSelection, 250);
+  });
+}
+
+// Last non-empty selection inside the article. On touch screens, tapping the
+// toolbar highlight button collapses the selection before the click handler
+// runs, so the button falls back to what was selected just before.
+let _lastReaderSelection = null;
+const LAST_SELECTION_TTL_MS = 30000;
+
+function rememberReaderSelection(range, text) {
+  if (!range || range.collapsed || !String(text || '').trim()) return;
+  _lastReaderSelection = { range: range.cloneRange(), text, at: Date.now() };
+}
+
+function takeLastReaderSelection() {
+  const last = _lastReaderSelection;
+  _lastReaderSelection = null;
+  if (!last || Date.now() - last.at > LAST_SELECTION_TTL_MS) return null;
+  if (!last.range.startContainer?.isConnected) return null;
+  return last;
 }
 
 function highlightCurrentDomSelection() {
   if (state.contentType !== 'epub') return false;
   const sel = window.getSelection?.();
-  if (!sel || sel.isCollapsed || sel.rangeCount === 0) return false;
-  const range = sel.getRangeAt(0);
-  return applyDomHighlightFromRange(range, sel.toString());
+  if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
+    _lastReaderSelection = null;
+    return applyDomHighlightFromRange(sel.getRangeAt(0), sel.toString());
+  }
+  const last = takeLastReaderSelection();
+  return last ? applyDomHighlightFromRange(last.range, last.text) : false;
 }
 
 function redrawDomHighlights() {
@@ -1472,8 +1503,9 @@ function showHighlightHint(message) {
    Keyboard Shortcuts
    ============================================================ */
 function isShortcutModifierDown(e) {
-  const isMac = navigator.platform.toUpperCase().includes('MAC');
-  return isMac ? e.metaKey : e.ctrlKey;
+  // iPadOS reports "MacIntel" (desktop-class browsing) or "iPad"; both use ⌘.
+  const isApple = /MAC|IPAD|IPHONE/.test(navigator.platform.toUpperCase());
+  return isApple ? e.metaKey : e.ctrlKey;
 }
 
 function handleKeyboardShortcut(e) {
@@ -1482,11 +1514,7 @@ function handleKeyboardShortcut(e) {
   switch (e.key.toLowerCase()) {
     case 'o':
       e.preventDefault();
-      if (state.isNative) {
-        sendNative('open');
-      } else {
-        openFileBrowser();
-      }
+      requestOpenFile();
       return true;
 
     case 's':
@@ -1640,6 +1668,32 @@ function setupTocToggle() {
   }
 }
 
+function isIOSHost() {
+  return window.BR_PLATFORM === 'ios';
+}
+
+function requestOpenFile() {
+  if (state.isNative) {
+    sendNative('open');
+  } else {
+    openFileBrowser();
+  }
+}
+
+function setupOpenButton() {
+  const btnOpen = document.getElementById('btnOpen');
+  if (btnOpen) btnOpen.addEventListener('click', requestOpenFile);
+
+  // iOS WebKit only applies :active (the pressed look) once a touchstart
+  // listener exists on the page.
+  if (isIOSHost()) document.addEventListener('touchstart', () => {}, { passive: true });
+
+  const hint = document.getElementById('welcomeHint');
+  if (hint && isIOSHost()) {
+    hint.textContent = '轻点右上角打开文件 · 支持 .md .txt .epub · 也可从「文件」打开';
+  }
+}
+
 function setupHighlightButtons() {
   const btnHighlight = document.getElementById('btnHighlight');
   if (btnHighlight) {
@@ -1674,6 +1728,7 @@ window.appHost = {
     state.contentType  = (type === 'epub') ? 'epub' : 'text';
     state.toc          = [];
     _pendingCfiRange   = null;
+    _lastReaderSelection = null;
     renderToc();
     updateTopbarState();
 
@@ -1777,6 +1832,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupThemeToggle();
   setupTocToggle();
   setupHighlightButtons();
+  setupOpenButton();
 
   // Set up editor live preview with debounce
   const editor = document.getElementById('editor');
