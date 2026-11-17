@@ -4,3 +4,4 @@ build/
 /BabyReader
 .claude/
 GITHUB_ABOUT.txt
+dist/
