@@ -33,8 +33,32 @@ int main(void) {
       }
     }
 
+    // Navigation allowlist: only bundled web/ pages and about:blank.
+    NSURL *web = [NSURL fileURLWithPath:@"/Applications/BabyReader.app/Contents/Resources/web" isDirectory:YES];
+    NSDictionary<NSString *, NSNumber *> *nav = @{
+      @"file:///Applications/BabyReader.app/Contents/Resources/web/index.html":            @YES,
+      @"file:///Applications/BabyReader.app/Contents/Resources/web/index.html#br-chapter-2": @YES,
+      @"about:blank":                                                                     @YES,
+      @"file:///Applications/BabyReader.app/Contents/Resources/web/../../Info.plist":       @NO,
+      @"file:///Applications/BabyReader.app/Contents/Resources/webx/index.html":           @NO,
+      @"file:///etc/passwd":                                                              @NO,
+      @"data:text/html,<p>x</p>":                                                         @NO,
+      @"blob:null/1234":                                                                  @NO,
+      @"https://example.com/":                                                            @NO,
+      @"x-custom://open":                                                                 @NO,
+    };
+    for (NSString *s in nav) {
+      NSURL *url = [NSURL URLWithString:s] ?: [NSURL URLWithString:[s stringByAddingPercentEncodingWithAllowedCharacters:NSCharacterSet.URLQueryAllowedCharacterSet]];
+      BOOL got = BRIsAppWebURL(url, web);
+      if (got != nav[s].boolValue) {
+        failures++;
+        fprintf(stderr, "FAIL nav %s -> %d\n", s.UTF8String, got);
+      }
+    }
+
     if (failures) return 1;
-    printf("highlight path checks passed (%lu cases)\n", (unsigned long)cases.count);
+    printf("highlight path checks passed (%lu cases), navigation checks passed (%lu cases)\n",
+           (unsigned long)cases.count, (unsigned long)nav.count);
   }
   return 0;
 }

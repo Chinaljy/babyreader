@@ -355,20 +355,23 @@ static NSArray<NSString *> *BRDefaultContentTypes(void) {
                     decisionHandler:(void (^)(WKNavigationActionPolicy))decisionHandler {
   NSURL *url = navigationAction.request.URL;
 
-  // Allow local file loads (initial page load)
-  if ([url isFileURL]) {
+  // Only the bundled web/ pages (initial load, #fragment jumps) load here.
+  NSURL *webDirURL = [[NSBundle mainBundle] URLForResource:@"web" withExtension:nil];
+  if (BRIsAppWebURL(url, webDirURL)) {
     decisionHandler(WKNavigationActionPolicyAllow);
     return;
   }
 
-  // For any external URL (http/https), open in default browser
-  if ([url.scheme isEqualToString:@"http"] || [url.scheme isEqualToString:@"https"]) {
+  // External http/https links open in the default browser.
+  NSString *scheme = url.scheme.lowercaseString;
+  if (navigationAction.targetFrame.isMainFrame &&
+      ([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"])) {
     [[NSWorkspace sharedWorkspace] openURL:url];
-    decisionHandler(WKNavigationActionPolicyCancel);
-    return;
   }
 
-  decisionHandler(WKNavigationActionPolicyAllow);
+  // Nothing else (data:, blob:, other local files, custom schemes) loads in
+  // the web view: whatever loads there can reach the native bridge.
+  decisionHandler(WKNavigationActionPolicyCancel);
 }
 
 // ---------------------------------------------------------------------------

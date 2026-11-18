@@ -11,6 +11,8 @@
 @import UniformTypeIdentifiers;
 @import CoreText;
 
+#import "../../native/BRConfinedPath.h"
+
 // ---------------------------------------------------------------------------
 // MARK: - Helpers
 // ---------------------------------------------------------------------------
@@ -450,7 +452,10 @@ typedef NS_ENUM(NSInteger, BRPickerPurpose) {
     BOOL silent = [payload[@"silent"] boolValue];
     if ([filename isKindOfClass:[NSString class]] && filename.length &&
         [content isKindOfClass:[NSString class]]) {
-      NSURL *url = [BRHighlightsDirectory() URLByAppendingPathComponent:filename.lastPathComponent];
+      // Same rule as the Mac: one plain .md name inside the highlights folder.
+      NSString *path = BRConfinedHighlightPath(BRHighlightsDirectory().path, filename);
+      if (!path) return;
+      NSURL *url = [NSURL fileURLWithPath:path];
       [content writeToURL:url atomically:YES encoding:NSUTF8StringEncoding error:nil];
       [self sendFunction:@"notifyHighlightFileWritten" payload:@{
         @"path": [@"BabyReader/" stringByAppendingString:url.lastPathComponent],
@@ -468,18 +473,20 @@ typedef NS_ENUM(NSInteger, BRPickerPurpose) {
     decidePolicyForNavigationAction:(WKNavigationAction *)navigationAction
                     decisionHandler:(void (^)(WKNavigationActionPolicy))decisionHandler {
   NSURL *url = navigationAction.request.URL;
-  if (url.isFileURL || [url.scheme isEqualToString:@"about"] ||
-      [url.scheme isEqualToString:@"blob"] || [url.scheme isEqualToString:@"data"]) {
+  NSURL *webDirURL = [[NSBundle mainBundle] URLForResource:@"web" withExtension:nil];
+  if (BRIsAppWebURL(url, webDirURL)) {
     decisionHandler(WKNavigationActionPolicyAllow);
     return;
   }
-  if ([url.scheme isEqualToString:@"http"] || [url.scheme isEqualToString:@"https"] ||
-      [url.scheme isEqualToString:@"mailto"]) {
+  NSString *scheme = url.scheme.lowercaseString;
+  if (navigationAction.targetFrame.isMainFrame &&
+      ([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"] ||
+       [scheme isEqualToString:@"mailto"])) {
     [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
-    decisionHandler(WKNavigationActionPolicyCancel);
-    return;
   }
-  decisionHandler(WKNavigationActionPolicyAllow);
+  // Nothing else (data:, blob:, other files, custom schemes) loads in the
+  // web view: whatever loads there can reach the native bridge.
+  decisionHandler(WKNavigationActionPolicyCancel);
 }
 
 // target="_blank" links
