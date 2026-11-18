@@ -161,7 +161,8 @@ function preprocessCustomBlocks(content) {
     }
   }
 
-  return outputHTML;
+  // marked passes raw HTML through; the document is untrusted.
+  return sanitizeDocumentHtml(outputHTML);
 }
 
 /**
@@ -328,6 +329,68 @@ function sanitizeEpubHtml(html) {
     .replace(/\s+style\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
     .replace(/\s+(href|src)\s*=\s*(["'])javascript:[\s\S]*?\2/gi, ' $1="#"')
     .replace(/\s+style\s*=\s*(?:"[^"]*"|'[^']*')/gi, '');
+}
+
+/**
+ * Allowlist-style sanitizer for document HTML (Markdown output and EPUB
+ * chapters) before it reaches innerHTML. Document content is untrusted: any
+ * script it runs gets the native bridge. Parsing happens in an inert
+ * <template>, so nothing executes or loads while we clean it.
+ */
+const DOC_BLOCKED_TAGS = new Set([
+  'script', 'style', 'iframe', 'frame', 'frameset', 'object', 'embed', 'applet',
+  'link', 'meta', 'base', 'form', 'input', 'button', 'textarea', 'select',
+  'option', 'noscript', 'template', 'portal', 'foreignobject', 'animate',
+  'animatemotion', 'animatetransform', 'set', 'handler', 'listener'
+]);
+const DOC_URL_ATTRS = new Set([
+  'href', 'xlink:href', 'src', 'action', 'formaction', 'poster', 'background',
+  'data', 'cite', 'longdesc', 'lowsrc', 'dynsrc', 'ping', 'manifest', 'codebase'
+]);
+const DOC_DROPPED_ATTRS = new Set(['style', 'srcdoc', 'srcset', 'is']);
+const DOC_MEDIA_URL_ATTRS = new Set(['src', 'xlink:href', 'poster']);
+
+function isSafeDocumentUrl(rawValue, attrName, tagName) {
+  // Strip whitespace and control characters browsers ignore inside schemes.
+  const value = String(rawValue || '').replace(/[\u0000- \u007f- ]+/g, '');
+  if (!value || value.startsWith('#')) return true;
+  const scheme = value.match(/^([a-z][a-z0-9+.-]*):/i);
+  if (!scheme) return true; // relative reference inside the bundled web dir
+  const name = scheme[1].toLowerCase();
+  if (name === 'http' || name === 'https' || name === 'mailto') return true;
+  const isMedia = DOC_MEDIA_URL_ATTRS.has(attrName) && tagName !== 'a';
+  if (isMedia && name === 'blob') return true;
+  if (isMedia && name === 'data') return /^data:(image|audio|video)\//i.test(value);
+  return false;
+}
+
+function sanitizeDocumentHtml(html) {
+  const source = String(html || '');
+  const template = typeof document !== 'undefined' && document.createElement
+    ? document.createElement('template')
+    : null;
+  if (!template || !('content' in template)) {
+    // No DOM to sanitize with: fail closed by showing the markup as text.
+    return escapeHtml(source);
+  }
+  template.innerHTML = source;
+
+  for (const el of Array.from(template.content.querySelectorAll('*'))) {
+    const tag = String(el.localName || '').toLowerCase();
+    if (DOC_BLOCKED_TAGS.has(tag)) {
+      el.remove();
+      continue;
+    }
+    for (const attr of Array.from(el.attributes)) {
+      const name = attr.name.toLowerCase();
+      if (name.startsWith('on') || DOC_DROPPED_ATTRS.has(name)) {
+        el.removeAttribute(attr.name);
+      } else if (DOC_URL_ATTRS.has(name) && !isSafeDocumentUrl(attr.value, name, tag)) {
+        el.removeAttribute(attr.name);
+      }
+    }
+  }
+  return template.innerHTML;
 }
 
 async function inlineResourceRefs(html, chapterPath, zip, mediaTypes) {
@@ -1086,7 +1149,7 @@ function destroyEpub() {
 async function renderEpubDocument(base64data) {
   destroyEpub();
   const epub = await parseEpub(base64data);
-  state.epubHtml = epub.html;
+  state.epubHtml = sanitizeDocumentHtml(epub.html);
   state.epubMetadata = epub.metadata || {};
   state.toc = epub.toc || [];
   renderToc();
@@ -1683,6 +1746,10 @@ function requestOpenFile() {
 function setupOpenButton() {
   const btnOpen = document.getElementById('btnOpen');
   if (btnOpen) btnOpen.addEventListener('click', requestOpenFile);
+  const btnModeRead = document.getElementById('btnRead');
+  const btnModeEdit = document.getElementById('btnEdit');
+  if (btnModeRead) btnModeRead.addEventListener('click', () => setMode('read'));
+  if (btnModeEdit) btnModeEdit.addEventListener('click', () => setMode('edit'));
 
   // iOS WebKit only applies :active (the pressed look) once a touchstart
   // listener exists on the page.

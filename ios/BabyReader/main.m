@@ -388,6 +388,8 @@ typedef NS_ENUM(NSInteger, BRPickerPurpose) {
 
 - (void)userContentController:(WKUserContentController *)ucc
       didReceiveScriptMessage:(WKScriptMessage *)message {
+  // Only the app's own top-level page may drive the bridge.
+  if (!message.frameInfo.isMainFrame) return;
   if (![message.body isKindOfClass:[NSDictionary class]]) return;
   NSDictionary *body    = message.body;
   NSString     *type    = body[@"type"];

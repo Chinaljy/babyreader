@@ -3,6 +3,8 @@
 @import CoreServices;
 @import UniformTypeIdentifiers;
 
+#import "BRConfinedPath.h"
+
 static NSArray<NSString *> *BRDefaultContentTypes(void) {
   return @[
     @"net.daringfireball.markdown",
@@ -230,6 +232,8 @@ static NSArray<NSString *> *BRDefaultContentTypes(void) {
 - (void)userContentController:(WKUserContentController *)ucc
       didReceiveScriptMessage:(WKScriptMessage *)message {
 
+  // Only the app's own top-level page may drive the bridge.
+  if (!message.frameInfo.isMainFrame) return;
   if (![message.body isKindOfClass:[NSDictionary class]]) return;
   NSDictionary *body    = (NSDictionary *)message.body;
   NSString     *type    = body[@"type"];
@@ -323,9 +327,10 @@ static NSArray<NSString *> *BRDefaultContentTypes(void) {
         [content isKindOfClass:[NSString class]]) {
       NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
       NSString *dir = [paths.firstObject stringByAppendingPathComponent:@"BabyReader"];
+      NSString *path = BRConfinedHighlightPath(dir, filename);
+      if (!path) return;
       [[NSFileManager defaultManager] createDirectoryAtPath:dir
                                 withIntermediateDirectories:YES attributes:nil error:nil];
-      NSString *path = [dir stringByAppendingPathComponent:filename];
       [content writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
       [self sendFunction:@"notifyHighlightFileWritten" payload:@{
         @"path": path,

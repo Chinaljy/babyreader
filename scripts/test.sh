@@ -32,6 +32,16 @@ clang \
 echo "Running WKWebView EPUB smoke test..."
 "${WK_RUNNER}" "${ROOT_DIR}" "${ROOT_DIR}/tests/wkwebview_markdown_smoke.js"
 "${WK_RUNNER}" "${ROOT_DIR}" "${ROOT_DIR}/tests/wkwebview_epub_smoke.js"
+"${WK_RUNNER}" "${ROOT_DIR}" "${ROOT_DIR}/tests/wkwebview_sanitizer_smoke.js"
+
+echo "Checking highlight path confinement..."
+clang \
+  -fobjc-arc \
+  -mmacosx-version-min="${MACOS_MIN_VERSION}" \
+  -framework Foundation \
+  "${ROOT_DIR}/tests/highlight_path_check.m" \
+  -o "${BUILD_DIR}/highlight_path_check"
+"${BUILD_DIR}/highlight_path_check"
 
 echo "Building BabyReader..."
 "${ROOT_DIR}/scripts/build.sh"
