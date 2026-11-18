@@ -32,7 +32,7 @@ A native macOS EPUB reader and Markdown editor with warm themes and highlighting
 
 ### Download the app
 
-Download `BabyReader-v2.0.3.zip` from the [latest GitHub release](https://github.com/KingJing1/babyreader/releases/latest), unzip it, and move `BabyReader.app` to your Applications folder before opening it.
+Download `BabyReader-v2.0.4.zip` from the [latest GitHub release](https://github.com/Chinaljy/babyreader/releases/latest), unzip it, and move `BabyReader.app` to your Applications folder before opening it.
 
 Because BabyReader is an independent open-source app without Apple notarization, macOS may block the first launch.
 
